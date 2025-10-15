@@ -9,6 +9,8 @@ use Livewire\Component;
 
 class ContactForm extends Component
 {
+    protected $middleware = ['throttle:5,1']; // 5 attempts per minute
+
     #[Validate('required|string|max:255')]
     public $name = '';
 

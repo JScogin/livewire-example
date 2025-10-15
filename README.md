@@ -6,6 +6,7 @@ A minimal contact form built with Laravel 12, Livewire 3, and TailwindCSS 4. Thi
 
 - **Contact Form**: Clean, responsive form with real-time validation
 - **Spam Protection**: Honeypot field to prevent automated submissions
+- **Rate Limiting**: Laravel's built-in throttle middleware (5 submissions per minute per IP)
 - **Email Notifications**: Automatic email alerts for new submissions
 - **Admin Panel**: Unauthenticated list view with search and pagination
 - **Responsive Design**: Mobile-first approach with TailwindCSS
@@ -128,6 +129,45 @@ MAIL_FROM_NAME="Your App Name"
 # Target email for contact form notifications
 MAIL_TARGET=gtest@mailgrove.com
 ```
+
+## Queue Configuration
+
+The application uses Laravel's queue system for email processing. You can configure different queue drivers based on your needs:
+
+### Development (Sync Driver)
+For local development, emails are sent immediately:
+```env
+QUEUE_CONNECTION=sync
+```
+
+### Production (Database Driver)
+For production with database queuing:
+```env
+QUEUE_CONNECTION=database
+```
+Then run the queue worker:
+```bash
+php artisan queue:work
+```
+
+### Production (Redis Driver)
+For production with Redis queuing:
+```env
+QUEUE_CONNECTION=redis
+REDIS_HOST=127.0.0.1
+REDIS_PASSWORD=null
+REDIS_PORT=6379
+```
+Then run the queue worker:
+```bash
+php artisan queue:work redis
+```
+
+### Queue Worker Management
+- **Start queue worker**: `php artisan queue:work`
+- **Start with specific connection**: `php artisan queue:work database`
+- **Start with timeout**: `php artisan queue:work --timeout=60`
+- **Start with memory limit**: `php artisan queue:work --memory=512`
 
 ## Database Seeding
 

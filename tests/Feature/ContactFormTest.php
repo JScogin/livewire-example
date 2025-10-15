@@ -48,7 +48,7 @@ class ContactFormTest extends TestCase
             ->assertSee('Thank you for your message!');
 
         $this->assertDatabaseCount('contact_submissions', 1);
-        
+
         $submission = ContactSubmission::first();
         $this->assertEquals('John Doe', $submission->name);
         $this->assertEquals('john@example.com', $submission->email);
@@ -98,5 +98,31 @@ class ContactFormTest extends TestCase
         $this->assertIsArray($submission->meta);
         $this->assertArrayHasKey('ip_address', $submission->meta);
         $this->assertArrayHasKey('user_agent', $submission->meta);
+    }
+
+    public function test_rate_limiting_prevents_spam()
+    {
+        // Submit 5 times (the limit)
+        for ($i = 0; $i < 5; $i++) {
+            Livewire::test(ContactForm::class)
+                ->set('name', 'John Doe')
+                ->set('email', 'john@example.com')
+                ->set('subject', 'Test Subject')
+                ->set('message', 'This is a test message.')
+                ->call('submit')
+                ->assertHasNoErrors();
+        }
+
+        // 6th submission should be rate limited by Laravel's throttle middleware
+        Livewire::test(ContactForm::class)
+            ->set('name', 'John Doe')
+            ->set('email', 'john@example.com')
+            ->set('subject', 'Test Subject')
+            ->set('message', 'This is a test message.')
+            ->call('submit')
+            ->assertStatus(429); // HTTP 429 Too Many Requests
+
+        // Should have exactly 5 submissions in database
+        $this->assertDatabaseCount('contact_submissions', 5);
     }
 }
