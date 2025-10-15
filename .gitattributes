@@ -1,23 +1,32 @@
-# Set default behavior to automatically normalize line endings
-* text=auto eol=crlf
+# Set default behavior to automatically normalize line endings to LF
+* text=auto eol=lf
 
 # Explicitly declare text files you want to always be normalized and converted
-# to native line endings on checkout
-*.php text eol=crlf
-*.blade.php text eol=crlf
-*.js text eol=crlf
-*.css text eol=crlf
-*.json text eol=crlf
-*.md text eol=crlf
-*.txt text eol=crlf
-*.yml text eol=crlf
-*.yaml text eol=crlf
+# to LF line endings on checkout
+*.php text eol=lf
+*.blade.php text eol=lf
+*.js text eol=lf
+*.css text eol=lf
+*.json text eol=lf
+*.md text eol=lf
+*.txt text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.xml text eol=lf
+*.html text eol=lf
+*.htm text eol=lf
+*.sql text eol=lf
+*.env text eol=lf
+*.env.* text eol=lf
+*.lock text eol=lf
+*.log text eol=lf
 
 # Declare files that will always have LF line endings on checkout
 *.sh text eol=lf
 
 # Declare files that will always have CRLF line endings on checkout
 *.bat text eol=crlf
+*.cmd text eol=crlf
 
 # Denote all files that are truly binary and should not be modified
 *.png binary
@@ -26,3 +35,17 @@
 *.gif binary
 *.ico binary
 *.svg binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.eot binary
+*.pdf binary
+*.zip binary
+*.tar binary
+*.gz binary
+*.rar binary
+*.7z binary
+*.exe binary
+*.dll binary
+*.so binary
+*.dylib binary
