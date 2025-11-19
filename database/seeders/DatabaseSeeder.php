@@ -26,5 +26,9 @@ class DatabaseSeeder extends Seeder
 
         // Seed contact submissions
         $this->call(ContactSubmissionSeeder::class);
+
+        $this->call(BoardSeeder::class);
+        $this->call(ColumnSeeder::class);
+        $this->call(ItemSeeder::class);
     }
 }

@@ -10,3 +10,5 @@ Route::get('/', function () {
 
 Route::get('/contact', ContactForm::class)->name('contact');
 Route::get('/admin/submissions', ContactSubmissionList::class)->name('admin.submissions');
+
+Route::livewire('/dashboard', 'pages::dashboard')->name('dashboard');
