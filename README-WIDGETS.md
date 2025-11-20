@@ -11,6 +11,11 @@ A complete REST API for managing Widgets built with Laravel 12, demonstrating AP
 - JSON metadata support
 - Request validation with clear error messages
 - Consistent JSON API responses
+- **Background job processing** with queue system
+- **Automatic widget processing** on create/update
+- **Delayed follow-up emails** (24 hours after creation)
+- **Daily statistics reports** (scheduled)
+- **Batch processing** capabilities
 - Comprehensive test coverage
 
 ## File Structure
@@ -29,27 +34,52 @@ app/
 │   └── Resources/
 │       ├── WidgetResource.php                # Single widget JSON transformation
 │       └── WidgetCollection.php              # Collection with pagination metadata
+├── Jobs/
+│   ├── ProcessWidgetJob.php                  # Process individual widget
+│   ├── SendWidgetFollowUpEmailJob.php        # Send follow-up email (24h delay)
+│   ├── GenerateDailyWidgetReportJob.php       # Generate daily statistics report
+│   └── ProcessWidgetBatchJob.php             # Process multiple widgets in batch
+├── Mail/
+│   ├── WidgetFollowUpEmail.php               # Follow-up email mailable
+│   └── WidgetDailyReport.php                 # Daily report email mailable
 ├── Models/
 │   └── Widget.php                            # Widget model with scopes and accessors
-└── Services/
-    └── WidgetService.php                     # Business logic layer
+├── Services/
+│   ├── WidgetService.php                     # Business logic layer
+│   └── WidgetJobService.php                  # Job management utilities
+└── Console/
+    └── Commands/
+        └── GenerateDailyWidgetReport.php     # Scheduled command for daily reports
 
 routes/
-└── api.php                                   # API routes with v1 prefix
+├── api.php                                   # API routes with v1 prefix
+└── console.php                               # Console routes with scheduled tasks
 
 database/
 ├── factories/
 │   └── WidgetFactory.php                     # Test data factory
 ├── migrations/
-│   └── YYYY_MM_DD_HHMMSS_create_widgets_table.php
+│   ├── YYYY_MM_DD_HHMMSS_create_widgets_table.php
+│   └── YYYY_MM_DD_HHMMSS_add_processing_fields_to_widgets_table.php
 └── seeders/
     └── WidgetSeeder.php                      # Optional seeder for sample data
 
+resources/
+└── views/
+    └── emails/
+        ├── widget-follow-up.blade.php         # Follow-up email template
+        └── widget-daily-report.blade.php     # Daily report email template
+
 tests/
 ├── Feature/
-│   └── Api/
-│       └── WidgetApiTest.php                 # Comprehensive API endpoint tests
+│   ├── Api/
+│   │   └── WidgetApiTest.php                 # Comprehensive API endpoint tests
+│   └── WidgetJobProcessingTest.php           # Job processing workflow tests
 └── Unit/
+    ├── Jobs/
+    │   ├── ProcessWidgetJobTest.php           # ProcessWidgetJob unit tests
+    │   ├── SendWidgetFollowUpEmailJobTest.php # Follow-up email job tests
+    │   └── GenerateDailyWidgetReportJobTest.php # Daily report job tests
     ├── Models/
     │   └── WidgetTest.php                    # Model tests (scopes, accessors, casts)
     └── Services/
@@ -86,7 +116,9 @@ http://localhost:8000/api/v1
 - `price` (decimal, nullable) - Widget price
 - `quantity` (integer, default: 0) - Available quantity
 - `status` (enum: active, inactive, archived, default: active) - Widget status
-- `metadata` (json, nullable) - Flexible JSON data
+- `metadata` (json, nullable) - Flexible JSON data (may include processing results, email addresses)
+- `processed_at` (timestamp, nullable) - When widget was last processed by ProcessWidgetJob
+- `email_sent_at` (timestamp, nullable) - When follow-up email was sent
 - `created_at` (timestamp) - Creation timestamp
 - `updated_at` (timestamp) - Last update timestamp
 - `deleted_at` (timestamp, nullable) - Soft delete timestamp
@@ -359,6 +391,106 @@ curl -X DELETE "http://localhost:8000/api/v1/widgets/1" \
 - Each field validated only if present
 - `name` unique rule ignores current widget
 
+## Background Job Processing
+
+The Widget API includes comprehensive background job processing capabilities:
+
+### Automatic Job Dispatching
+
+Jobs are automatically dispatched when widgets are created or updated:
+
+- **Creating a Widget** (POST `/api/v1/widgets`):
+  - `ProcessWidgetJob` - Processes widget immediately (calculates statistics, updates metadata)
+  - `SendWidgetFollowUpEmailJob` - Sends follow-up email after 24 hours (if email in metadata)
+
+- **Updating a Widget** (PUT/PATCH `/api/v1/widgets/{id}`):
+  - `ProcessWidgetJob` - Recalculates statistics after update
+
+### Available Jobs
+
+#### ProcessWidgetJob
+- **Purpose**: Process individual widget, calculate statistics, update metadata
+- **Queue**: `default`
+- **Tries**: 3 attempts
+- **Timeout**: 60 seconds
+- **Actions**:
+  - Calculates total value (price × quantity)
+  - Determines if widget is high value (> $1000)
+  - Updates `processed_at` timestamp
+  - Stores processing data in metadata
+
+#### SendWidgetFollowUpEmailJob
+- **Purpose**: Send follow-up email 24 hours after widget creation
+- **Queue**: `default`
+- **Delay**: 24 hours
+- **Tries**: 3 attempts
+- **Timeout**: 30 seconds
+- **Actions**:
+  - Sends email if `email` or `contact_email` in metadata
+  - Updates `email_sent_at` timestamp
+  - Skips if email already sent
+
+#### GenerateDailyWidgetReportJob
+- **Purpose**: Generate and email daily statistics report
+- **Queue**: `default`
+- **Tries**: 2 attempts
+- **Timeout**: 120 seconds
+- **Schedule**: Daily at 9:00 AM (via scheduler)
+- **Actions**:
+  - Calculates daily statistics (created, updated, deleted, processed, emails sent)
+  - Generates totals (active, inactive, archived)
+  - Emails report to admin address
+
+#### ProcessWidgetBatchJob
+- **Purpose**: Process multiple widgets in batches
+- **Queue**: `default`
+- **Tries**: 2 attempts
+- **Timeout**: 300 seconds
+- **Actions**:
+  - Processes up to 50 unprocessed widgets (or specified IDs)
+  - Dispatches individual `ProcessWidgetJob` for each widget
+
+### Queue Configuration
+
+Jobs require a queue worker to execute. Configure in `.env`:
+
+```env
+# For immediate execution (development)
+QUEUE_CONNECTION=sync
+
+# For background processing (production)
+QUEUE_CONNECTION=database
+```
+
+Then run the queue worker:
+```bash
+php artisan queue:work
+```
+
+### Scheduled Tasks
+
+The daily report is automatically scheduled to run at 9:00 AM:
+
+```bash
+# Manual execution
+php artisan widgets:generate-daily-report
+```
+
+### Job Testing
+
+All jobs are fully tested. Run job tests:
+
+```bash
+# Run all job tests
+php artisan test --filter="Job"
+
+# Run specific job tests
+php artisan test tests/Unit/Jobs/ProcessWidgetJobTest.php
+php artisan test tests/Unit/Jobs/SendWidgetFollowUpEmailJobTest.php
+php artisan test tests/Unit/Jobs/GenerateDailyWidgetReportJobTest.php
+php artisan test tests/Feature/WidgetJobProcessingTest.php
+```
+
 ## Testing
 
 Run the test suite:
@@ -371,6 +503,8 @@ php artisan test --filter=Widget
 php artisan test tests/Feature/Api/WidgetApiTest.php
 php artisan test tests/Unit/Services/WidgetServiceTest.php
 php artisan test tests/Unit/Models/WidgetTest.php
+php artisan test tests/Feature/WidgetJobProcessingTest.php
+php artisan test tests/Unit/Jobs/
 ```
 
 ## Rate Limiting
@@ -410,6 +544,12 @@ php artisan tinker
 6. **Query Scopes**: Reusable query filters in the model
 7. **Exception Handling**: Custom API error responses
 8. **Route Model Binding**: Automatic model resolution
+9. **Background Job Processing**: Async task execution with queue system
+10. **Job Chaining**: Sequential job execution (create → process → email)
+11. **Delayed Job Execution**: Scheduled jobs with time delays
+12. **Scheduled Tasks**: Cron-like scheduled command execution
+13. **Retry Logic**: Exponential backoff for failed jobs
+14. **Batch Processing**: Efficient processing of multiple records
 
 ## Notes
 
