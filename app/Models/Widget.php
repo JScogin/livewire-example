@@ -23,6 +23,8 @@ class Widget extends Model
         'quantity',
         'status',
         'metadata',
+        'processed_at',
+        'email_sent_at',
     ];
 
     /**
@@ -34,6 +36,8 @@ class Widget extends Model
         'price' => 'float',
         'quantity' => 'integer',
         'metadata' => 'array',
+        'processed_at' => 'datetime',
+        'email_sent_at' => 'datetime',
     ];
 
     /**

@@ -2,6 +2,8 @@
 
 namespace App\Services;
 
+use App\Jobs\ProcessWidgetJob;
+use App\Jobs\SendWidgetFollowUpEmailJob;
 use App\Models\Widget;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -88,7 +90,16 @@ class WidgetService
      */
     public function create(array $data): Widget
     {
-        return Widget::create($data);
+        $widget = Widget::create($data);
+
+        // Dispatch processing job
+        ProcessWidgetJob::dispatch($widget);
+
+        // Dispatch follow-up email job with 24-hour delay
+        SendWidgetFollowUpEmailJob::dispatch($widget)
+            ->delay(now()->addHours(24));
+
+        return $widget;
     }
 
     /**
@@ -113,6 +124,9 @@ class WidgetService
         }
 
         $widget->save();
+
+        // Dispatch processing job to recalculate statistics
+        ProcessWidgetJob::dispatch($widget->fresh());
 
         return $widget->fresh();
     }
